@@ -1,0 +1,19 @@
+#!/usr/bin/env bash
+DIR="$(dirname "$(readlink -f "$0")")"
+source "$DIR/../lib.sh"
+
+branch="$(current_branch)"
+if [ -n "$branch" ] && is_protected "$branch"; then
+  warn "BLOCKED: commit on protected branch '$branch'."
+  warn "Create a branch first: git switch -c feature/<name>"
+  exit 1
+fi
+
+bad="$(git diff --cached --name-only | grep -Ei "$SECRET_PATTERN" | grep -v '\.example$' || true)"
+if [ -n "$bad" ]; then
+  warn "BLOCKED: staged files look like secrets or state files:"
+  printf '  %s\n' $bad >&2
+  warn "Unstage them with: git restore --staged <file>"
+  exit 1
+fi
+exit 0

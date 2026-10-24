@@ -1,0 +1,14 @@
+#!/usr/bin/env bash
+DIR="$(dirname "$(readlink -f "$0")")"
+source "$DIR/../lib.sh"
+
+while read -r local_ref local_sha remote_ref remote_sha; do
+  case "$remote_ref" in refs/heads/*) ;; *) continue ;; esac
+  target="${remote_ref#refs/heads/}"
+  if is_protected "$target"; then
+    warn "BLOCKED: push to protected branch '$target'."
+    warn "Push your own branch and open a pull request instead."
+    exit 1
+  fi
+done
+exit 0

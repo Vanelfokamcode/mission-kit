@@ -1,0 +1,10 @@
+# Never commit work or client material, personal documents, or secrets
+06-logs/
+missions/
+*.docx
+.env
+.env.*
+*.pem
+*.key
+*.tfstate*
+*.bak

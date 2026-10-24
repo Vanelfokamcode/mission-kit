@@ -1,0 +1,49 @@
+#!/usr/bin/env bash
+# gday: safe conventional commit in one command
+# usage: gday <feat|fix|refactor|docs|chore> "description"
+#        gday            (interactive menu)
+set -euo pipefail
+DIR="$(dirname "$(readlink -f "$0")")"
+source "$DIR/lib.sh"
+
+git rev-parse --is-inside-work-tree >/dev/null 2>&1 || die "Not inside a git repository."
+
+TYPES="feat fix refactor docs chore"
+type="${1:-}"; shift || true
+desc="$*"
+
+if [ -z "$type" ]; then
+  echo "Commit type:"
+  select t in $TYPES; do type="${t:-}"; break; done
+fi
+case " $TYPES " in *" $type "*) ;; *) die "Unknown type '$type'. Choose one of: $TYPES" ;; esac
+
+[ -n "$desc" ] || read -r -p "Description: " desc
+[ -n "$desc" ] || die "A description is required."
+msg="$type: $desc"
+[ ${#msg} -le 72 ] || warn "Subject is ${#msg} characters; aim for 72 or less."
+
+branch="$(current_branch)"
+if [ -n "$branch" ] && is_protected "$branch"; then
+  newbranch="$(branch_prefix "$type")/$(slugify "$desc")"
+  warn "You are on '$branch', a protected branch. Never commit directly here."
+  read -r -p "Create and switch to '$newbranch'? [Y/n] " a
+  case "${a:-Y}" in
+    [Yy]*) git switch -c "$newbranch"; branch="$newbranch" ;;
+    *) die "Aborted. Create a branch first: git switch -c feature/<name>" ;;
+  esac
+fi
+
+if git diff --cached --quiet; then
+  [ -n "$(git status --porcelain)" ] || die "Nothing to commit."
+  git status --short
+  read -r -p "Nothing staged. Stage everything listed above? [y/N] " a
+  case "${a:-N}" in
+    [Yy]*) git add -A ;;
+    *) die "Stage what you want (git add <file>), then run gday again." ;;
+  esac
+fi
+
+git commit -m "$msg"
+ok "Committed on '$branch'."
+echo "Next: git push -u origin $branch"

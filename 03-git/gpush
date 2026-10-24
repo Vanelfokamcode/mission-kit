@@ -1,0 +1,24 @@
+#!/usr/bin/env bash
+# gpush: safe push of the current branch
+set -euo pipefail
+DIR="$(dirname "$(readlink -f "$0")")"
+source "$DIR/lib.sh"
+
+git rev-parse --is-inside-work-tree >/dev/null 2>&1 || die "Not inside a git repository."
+branch="$(current_branch)"
+[ -n "$branch" ] || die "Detached HEAD: switch to a branch first."
+if is_protected "$branch"; then
+  die "'$branch' is protected. Create a branch first: git switch -c feature/<name>"
+fi
+git remote get-url origin >/dev/null 2>&1 || die "No remote named 'origin'."
+[ -z "$(git status --porcelain)" ] || warn "You have uncommitted changes; they are NOT pushed."
+
+git push -u origin "$branch"
+
+url="$(git remote get-url origin)"
+case "$url" in
+  *github.com*)
+    slug="$(printf '%s' "$url" | sed -E 's#^(git@github\.com:|https://github\.com/)##; s#\.git$##')"
+    ok "Pushed. Open a pull request: https://github.com/$slug/pull/new/$branch" ;;
+  *) ok "Pushed '$branch'. Now open a pull request on your platform." ;;
+esac
