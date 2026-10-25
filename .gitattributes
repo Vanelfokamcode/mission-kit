@@ -1,0 +1,6 @@
+* text=auto
+*.sh text eol=lf
+*.md text eol=lf
+03-git/gday text eol=lf
+03-git/gpush text eol=lf
+03-git/hooks/* text eol=lf

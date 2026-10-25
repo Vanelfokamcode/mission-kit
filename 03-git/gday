@@ -1,49 +1,91 @@
 #!/usr/bin/env bash
 # gday: safe conventional commit in one command
-# usage: gday <feat|fix|refactor|docs|chore> "description"
-#        gday            (interactive menu)
+# usage: gday <feat|fix|refactor|perf|docs|test|chore> "description"
+#        gday            (asks for the type)
 set -euo pipefail
 DIR="$(dirname "$(readlink -f "$0")")"
 source "$DIR/lib.sh"
 
 git rev-parse --is-inside-work-tree >/dev/null 2>&1 || die "Not inside a git repository."
+gitdir="$(git rev-parse --git-dir)"
 
-TYPES="feat fix refactor docs chore"
-type="${1:-}"; shift || true
+TYPES="feat fix refactor perf docs test chore"
+ctype="${1:-}"; shift || true
 desc="$*"
 
-if [ -z "$type" ]; then
-  echo "Commit type:"
-  select t in $TYPES; do type="${t:-}"; break; done
+# Refuse risky repository states
+branch="$(current_branch)"
+[ -n "$branch" ] || die "Detached HEAD: switch to a branch first (git switch <branch> or git switch -c <new-branch>)."
+if [ -e "$gitdir/MERGE_HEAD" ] || [ -e "$gitdir/CHERRY_PICK_HEAD" ] || [ -d "$gitdir/rebase-merge" ] || [ -d "$gitdir/rebase-apply" ]; then
+  die "A merge, rebase or cherry-pick is in progress. Finish it with plain git commands, then use gday."
 fi
-case " $TYPES " in *" $type "*) ;; *) die "Unknown type '$type'. Choose one of: $TYPES" ;; esac
+[ -z "$(git ls-files -u)" ] || die "Unresolved conflicts. Resolve them first (see oops-recipes.md)."
 
-[ -n "$desc" ] || read -r -p "Description: " desc
+# Identity (never commit with the wrong one)
+name="$(git config user.name || true)"
+email="$(git config user.email || true)"
+[ -n "$name" ] && [ -n "$email" ] || die "No git identity for this repo. Set it: git config user.name \"...\" and git config user.email \"...\""
+
+# Type and description
+if [ -z "$ctype" ]; then
+  read -r -p "Type ($TYPES): " ctype || die "No input."
+fi
+valid=0
+for t in $TYPES; do
+  if [ "$ctype" = "$t" ]; then valid=1; fi
+done
+[ "$valid" -eq 1 ] || die "Unknown type '$ctype'. Choose one of: $TYPES"
+
+if [ -z "${desc//[[:space:]]/}" ]; then
+  read -r -p "Description: " desc || die "No input."
+fi
+desc="$(printf '%s' "$desc" | sed -E 's/^[[:space:]]+//; s/[[:space:]]+$//')"
 [ -n "$desc" ] || die "A description is required."
-msg="$type: $desc"
+msg="$ctype: $desc"
 [ ${#msg} -le 72 ] || warn "Subject is ${#msg} characters; aim for 72 or less."
 
-branch="$(current_branch)"
-if [ -n "$branch" ] && is_protected "$branch"; then
-  newbranch="$(branch_prefix "$type")/$(slugify "$desc")"
+# Decide about staging BEFORE touching any branch
+need_stage=0
+if git diff --cached --quiet; then
+  [ -n "$(git status --porcelain)" ] || die "Nothing to commit."
+  git status --short
+  read -r -p "Nothing staged. Stage everything listed above? [y/N] " a || die "No input."
+  case "${a:-N}" in
+    [Yy]*) need_stage=1 ;;
+    *) die "Stage what you want (git add <file>), then run gday again." ;;
+  esac
+fi
+
+# Protected branch: offer a new branch
+if is_protected "$branch"; then
+  prefix="$(branch_prefix "$ctype")"
+  slug="$(slugify "$desc")"
+  [ -n "$slug" ] || slug="update-$(date +%Y%m%d-%H%M)"
+  newbranch="$prefix/$slug"
+  if git show-ref --verify --quiet "refs/heads/$newbranch"; then
+    newbranch="$newbranch-$(date +%H%M%S)"
+  fi
   warn "You are on '$branch', a protected branch. Never commit directly here."
-  read -r -p "Create and switch to '$newbranch'? [Y/n] " a
+  read -r -p "Create and switch to '$newbranch'? [Y/n] " a || die "No input."
   case "${a:-Y}" in
     [Yy]*) git switch -c "$newbranch"; branch="$newbranch" ;;
     *) die "Aborted. Create a branch first: git switch -c feature/<name>" ;;
   esac
 fi
 
-if git diff --cached --quiet; then
-  [ -n "$(git status --porcelain)" ] || die "Nothing to commit."
-  git status --short
-  read -r -p "Nothing staged. Stage everything listed above? [y/N] " a
-  case "${a:-N}" in
-    [Yy]*) git add -A ;;
-    *) die "Stage what you want (git add <file>), then run gday again." ;;
-  esac
+[ "$need_stage" -eq 0 ] || git add -A
+
+# Secret check (also done by the pre-commit hook, but not every clone has it)
+bad="$(secret_files_staged)"
+if [ -n "$bad" ]; then
+  warn "BLOCKED: staged files look like secrets or state files:"
+  printf '%s\n' "$bad" | sed 's/^/  /' >&2
+  warn "Unstage them: git restore --staged <file>, and add them to .gitignore."
+  exit 1
 fi
 
+echo "Author: $name <$email>"
 git commit -m "$msg"
 ok "Committed on '$branch'."
-echo "Next: git push -u origin $branch"
+[ -z "$(git status --porcelain)" ] || warn "Some changes were not committed (not staged)."
+echo "Next: gpush"
