@@ -1,0 +1,13 @@
+#!/usr/bin/env bash
+# newlog: create today's daily log from the template
+set -euo pipefail
+KIT="${MISSION_KIT:-$HOME/mission-kit}"
+dir="$KIT/06-logs/daily"
+mkdir -p "$dir"
+file="$dir/$(date +%F).md"
+if [ -e "$file" ]; then
+  echo "Already exists: $file"
+else
+  sed "s/AAAA-MM-JJ/$(date +%F)/" "$KIT/02-daily/daily-log-template.md" > "$file"
+  echo "Created: $file"
+fi

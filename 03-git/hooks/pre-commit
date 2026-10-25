@@ -9,10 +9,10 @@ if [ -n "$branch" ] && is_protected "$branch"; then
   exit 1
 fi
 
-bad="$(git diff --cached --name-only | grep -Ei "$SECRET_PATTERN" | grep -v '\.example$' || true)"
+bad="$(secret_files_staged)"
 if [ -n "$bad" ]; then
   warn "BLOCKED: staged files look like secrets or state files:"
-  printf '  %s\n' $bad >&2
+  printf '%s\n' "$bad" | sed 's/^/  /' >&2
   warn "Unstage them with: git restore --staged <file>"
   exit 1
 fi

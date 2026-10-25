@@ -49,3 +49,9 @@ Note les réponses dans le log du jour 1. Les règles du client ou de la mission
 Bonjour [Prénom], je démarre sur [mission]. Pour être efficace dès cette semaine, pourrais-tu m'indiquer :
 mon référent technique, les accès à demander et à qui, les règles Git/PR de l'équipe, et ce que je peux utiliser comme
 outil d'IA sur ce projet ? Merci !
+
+## 8. À faire sur chaque nouveau clone
+- [ ] Identité Git du dépôt réglée avec l'e-mail de l'entreprise (`git config user.email`).
+- [ ] `install-guard.sh` lancé (si le dépôt n'a pas ses propres hooks), et branches protégées du client réglées
+      (`git config mission.protectedBranches "..."`).
+- [ ] Version de Git suffisante (`git --version`, au moins 2.23).
