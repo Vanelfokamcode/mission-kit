@@ -8,3 +8,4 @@ missions/
 *.key
 *.tfstate*
 *.bak
+tests/e2e/out/
