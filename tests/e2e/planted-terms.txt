@@ -1,0 +1,17 @@
+# One term per line. Any of these surviving in a sanitized text is a leak.
+atlas
+fictiva
+julien
+moreau
+camille
+durand
+ATL-142
+#57
+pkg.
+.example
+10.12.4.7
+srv-retrodoc
+#atlas-dev
+def split_by_lines
+4 320
+TESTTOKEN
