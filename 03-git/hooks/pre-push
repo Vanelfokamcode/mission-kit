@@ -2,7 +2,7 @@
 DIR="$(dirname "$(readlink -f "$0")")"
 source "$DIR/../lib.sh"
 
-while read -r local_ref local_sha remote_ref remote_sha; do
+while read -r _ _ remote_ref _; do
   case "$remote_ref" in refs/heads/*) ;; *) continue ;; esac
   target="${remote_ref#refs/heads/}"
   if is_protected "$target"; then
